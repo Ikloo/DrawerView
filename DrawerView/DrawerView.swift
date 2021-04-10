@@ -65,9 +65,9 @@ let kDefaultShadowRadius: CGFloat = 1.0
 
 let kDefaultShadowOpacity: Float = 0.05
 
-let kDefaultBackgroundEffect = UIBlurEffect(style: .extraLight)
-
 let kDefaultBorderColor = UIColor(white: 0.2, alpha: 0.2)
+
+let kDefaultOverlayBackgroundColor = UIColor.black
 
 let kOverlayOpacity: CGFloat = 0.5
 
@@ -138,6 +138,12 @@ private struct ChildScrollViewInfo {
         case fixed(height: CGFloat)
     }
 
+    public enum BackgroundEffectStyle {
+        case none
+        case visualEffect(UIVisualEffect)
+        case systemDefault
+    }
+
     // MARK: - Visual properties
 
     /// The corner radius of the drawer view.
@@ -163,7 +169,7 @@ private struct ChildScrollViewInfo {
 
     /// The used effect for the drawer view background. When set to nil no
     /// effect is used.
-    public var backgroundEffect: UIVisualEffect? = kDefaultBackgroundEffect {
+    public var backgroundEffect: BackgroundEffectStyle = .systemDefault {
         didSet {
             updateVisuals()
         }
@@ -190,6 +196,18 @@ private struct ChildScrollViewInfo {
     public var overlayVisibilityBehavior: OverlayVisibilityBehavior = .topmostPosition {
         didSet {
             updateVisuals()
+        }
+    }
+
+    public var overlayBackgroundColor: UIColor = kDefaultOverlayBackgroundColor {
+        didSet {
+            updateVisuals()
+        }
+    }
+
+    public var overlayOpacity: CGFloat = kOverlayOpacity {
+        didSet {
+            setPosition(currentPosition, animated: false, notifyDelegate: false)
         }
     }
 
@@ -248,6 +266,13 @@ private struct ChildScrollViewInfo {
         panGestureRecognizer.minimumNumberOfTouches = 1
         return panGestureRecognizer
     }()
+    
+    /// Damping ratio of the spring animation when opening or closing the drawer 
+    public var animationSpringDampingRatio: CGFloat = 0.8
+
+    /// Boolean indicating if the activity drawer should dismiss when you scroll down
+    /// on an internal scrollView after scroll reached top of that view.
+    public var childScrollViewsPanningCanDismissDrawer = true
 
     /// Boolean indicating whether the drawer is enabled. When disabled, all user
     /// interaction with the drawer is disabled. However, user interaction with the
@@ -406,7 +431,7 @@ private struct ChildScrollViewInfo {
 
     private let borderView = UIView()
 
-    private let backgroundView = UIVisualEffectView(effect: kDefaultBackgroundEffect)
+    private let backgroundView = UIVisualEffectView(effect: nil)
 
     private var willConceal: Bool = false
 
@@ -508,24 +533,10 @@ private struct ChildScrollViewInfo {
 
         self.translatesAutoresizingMaskIntoConstraints = false
 
-        setupVisuals()
         setupBackgroundView()
         setupBorderView()
 
         updateVisuals()
-    }
-
-    private func setupVisuals() {
-        if #available(iOS 12.0, *) {
-            switch self.traitCollection.userInterfaceStyle {
-            case .dark:
-                self.backgroundEffect = UIBlurEffect(style: .dark)
-            case .light: fallthrough
-            case .unspecified: fallthrough
-            @unknown default:
-                break
-            }
-        }
     }
 
     private func setupBackgroundView() {
@@ -664,7 +675,7 @@ private struct ChildScrollViewInfo {
             // Create the animator.
             let animator = UIViewPropertyAnimator(
                 duration: drawerAnimationDuration,
-                timingParameters: UISpringTimingParameters(dampingRatio: 0.8))
+                timingParameters: UISpringTimingParameters(dampingRatio: animationSpringDampingRatio))
             animator.addAnimations {
                 self.setScrollPosition(scrollPosition, notifyDelegate: notifyDelegate)
             }
@@ -832,7 +843,7 @@ private struct ChildScrollViewInfo {
                 } else if !childReachedTheTop && !scrollingToBottom {
                     shouldScrollChildView = true
                 } else if childReachedTheTop && !scrollingToBottom {
-                    shouldScrollChildView = false
+                    shouldScrollChildView = !childScrollViewsPanningCanDismissDrawer
                 } else if !isFullyExpanded {
                     shouldScrollChildView = false
                 } else {
@@ -1060,10 +1071,29 @@ private struct ChildScrollViewInfo {
         self.setNeedsDisplay()
     }
 
+    public override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
+        if #available(iOS 13.0, *) {
+            if traitCollection.hasDifferentColorAppearance(comparedTo: previousTraitCollection) {
+                updateVisuals()
+            }
+        }
+    }
+
+    private func roundTopRightLeftCorners(_ layer: CALayer) {
+        if #available(iOS 11.0, *) {
+            layer.maskedCorners = [
+                .layerMaxXMinYCorner, // top right
+                .layerMinXMinYCorner  // top left
+            ]
+            layer.masksToBounds = true
+        }
+        layer.cornerRadius = self.cornerRadius
+    }
+
     private func updateLayerVisuals(_ layer: CALayer) {
         layer.shadowRadius = shadowRadius
         layer.shadowOpacity = shadowOpacity
-        layer.cornerRadius = self.cornerRadius
+        roundTopRightLeftCorners(layer)
     }
 
     private func updateBorderVisuals(_ borderView: UIView) {
@@ -1073,13 +1103,13 @@ private struct ChildScrollViewInfo {
     }
 
     private func updateOverlayVisuals(_ overlay: Overlay?) {
-        overlay?.backgroundColor = UIColor.black
+        overlay?.backgroundColor = self.overlayBackgroundColor
         overlay?.cornerRadius = self.cornerRadius
     }
 
     private func updateBackgroundVisuals(_ backgroundView: UIVisualEffectView) {
-
         backgroundView.effect = self.backgroundEffect
+            .effect(inTraitCollection: self.traitCollection)
         if #available(iOS 11.0, *) {
             backgroundView.layer.cornerRadius = self.cornerRadius
             backgroundView.layer.maskedCorners = [.layerMaxXMinYCorner, .layerMinXMinYCorner]
@@ -1189,7 +1219,7 @@ private struct ChildScrollViewInfo {
 
         if opacityFactor > 0 {
             self.overlay = self.overlay ?? createOverlay()
-            self.overlay?.alpha = opacityFactor * kOverlayOpacity
+            self.overlay?.alpha = opacityFactor * overlayOpacity
             self.shouldRemoveOverlay = false
         } else {
             self.overlay?.alpha = 0
@@ -1390,7 +1420,7 @@ extension DrawerView: UIGestureRecognizerDelegate {
 
 }
 
-// MARK: - Private Extensions
+// MARK: - Public Extensions
 
 public extension DrawerView {
 
@@ -1405,6 +1435,28 @@ public extension DrawerView {
     }
 }
 
+
+// MARK: - Private Extensions
+
+extension DrawerView.BackgroundEffectStyle {
+
+    func effect(inTraitCollection traitCollection: UITraitCollection) -> UIVisualEffect? {
+        switch self {
+        case .none: return nil
+        case let .visualEffect(effect): return effect
+        case .systemDefault:
+            let darkMode: Bool
+            if #available(iOS 12.0, *) {
+                darkMode = (traitCollection.userInterfaceStyle == .dark)
+            } else {
+                darkMode = false
+            }
+            return darkMode
+                ? UIBlurEffect(style: .dark)
+                : UIBlurEffect(style: .light)
+        }
+    }
+}
 
 fileprivate extension CGRect {
 
@@ -1474,7 +1526,7 @@ fileprivate extension UIGestureRecognizer.State {
     }
 }
 
-#if !swift(>=4.2)
+#if !swift(>=4.1)
 fileprivate extension Array {
 
     // Backwards support for compactMap.

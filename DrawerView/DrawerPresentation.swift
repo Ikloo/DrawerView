@@ -4,8 +4,7 @@
 //
 //  Created by Mikko Välimäki on 2019-11-24.
 //
-
-import Foundation
+import UIKit
 
 public protocol DrawerPresenter {
     func presentDrawerModal(_ presentedViewController: UIViewController, openHeightBehavior: DrawerView.OpenHeightBehavior)
@@ -62,7 +61,7 @@ public class DrawerPresentationController: UIPresentationController {
 
     public override func presentationTransitionDidEnd(_ completed: Bool) {
         super.presentationTransitionDidEnd(completed)
-        presentationDelegate?.drawerPresentationnDidEnd?(completed)
+        presentationDelegate?.drawerPresentationDidEnd?(completed)
     }
 
     public override func dismissalTransitionWillBegin() {
@@ -92,7 +91,7 @@ public class DrawerPresentationController: UIPresentationController {
 @objc public protocol DrawerPresentationDelegate {
 
     @objc optional func drawerPresentationWillBegin()
-    @objc optional func drawerPresentationnDidEnd(_ completed: Bool)
+    @objc optional func drawerPresentationDidEnd(_ completed: Bool)
     @objc optional func drawerDismissalWillBegin()
     @objc optional func drawerDismissalDidEnd(_ completed: Bool)
 }
