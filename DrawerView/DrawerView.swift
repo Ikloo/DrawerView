@@ -147,7 +147,7 @@ private struct ChildScrollViewInfo {
     // MARK: - Visual properties
 
     /// The corner radius of the drawer view.
-    @IBInspectable public var cornerRadius: CGFloat = kDefaultCornerRadius {
+    @IBInspectable public var contentCornerRadius: CGFloat = kDefaultCornerRadius {
         didSet {
             updateVisuals()
         }
@@ -1066,7 +1066,7 @@ private struct ChildScrollViewInfo {
         updateOverlayVisuals(self.overlay)
         updateBackgroundVisuals(self.backgroundView)
         heightConstraint?.constant = -self.topSpace
-        overlayBottomConstraint?.constant = self.cornerRadius
+        overlayBottomConstraint?.constant = self.contentCornerRadius
 
         self.setNeedsDisplay()
     }
@@ -1087,7 +1087,7 @@ private struct ChildScrollViewInfo {
             ]
             layer.masksToBounds = true
         }
-        layer.cornerRadius = self.cornerRadius
+        layer.cornerRadius = self.contentCornerRadius
     }
 
     private func updateLayerVisuals(_ layer: CALayer) {
@@ -1097,28 +1097,28 @@ private struct ChildScrollViewInfo {
     }
 
     private func updateBorderVisuals(_ borderView: UIView) {
-        borderView.layer.cornerRadius = self.cornerRadius
+        borderView.layer.cornerRadius = self.contentCornerRadius
         borderView.layer.borderColor = self.borderColor.cgColor
         borderView.layer.borderWidth = 0.5
     }
 
     private func updateOverlayVisuals(_ overlay: Overlay?) {
         overlay?.backgroundColor = self.overlayBackgroundColor
-        overlay?.cornerRadius = self.cornerRadius
+        overlay?.cornerRadius = self.contentCornerRadius
     }
 
     private func updateBackgroundVisuals(_ backgroundView: UIVisualEffectView) {
         backgroundView.effect = self.backgroundEffect
             .effect(inTraitCollection: self.traitCollection)
         if #available(iOS 11.0, *) {
-            backgroundView.layer.cornerRadius = self.cornerRadius
+            backgroundView.layer.cornerRadius = self.contentCornerRadius
             backgroundView.layer.maskedCorners = [.layerMaxXMinYCorner, .layerMinXMinYCorner]
         } else {
             // Fallback on earlier versions
             let mask: CAShapeLayer = {
                 let m = CAShapeLayer()
                 let frame = backgroundView.bounds.insetBy(top: 0, bottom: -kVerticalLeeway, left: 0, right: 0)
-                let path = UIBezierPath(roundedRect: frame, byRoundingCorners: [.topLeft, .topRight], cornerRadii: CGSize(width: self.cornerRadius, height: self.cornerRadius))
+                let path = UIBezierPath(roundedRect: frame, byRoundingCorners: [.topLeft, .topRight], cornerRadii: CGSize(width: self.contentCornerRadius, height: self.contentCornerRadius))
                 m.path = path.cgPath
                 return m
             }()
@@ -1166,7 +1166,7 @@ private struct ChildScrollViewInfo {
 
         let overlayBottomConstraint = overlay.bottomAnchor.constraint(
             equalTo: self.topAnchor,
-            constant: self.cornerRadius)
+            constant: self.contentCornerRadius)
 
         NSLayoutConstraint.activate([
             overlay.leadingAnchor.constraint(equalTo: superview.leadingAnchor),
